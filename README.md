@@ -1,10 +1,12 @@
 # Birthday-Calendar
- It displays birthday events from a JSON file on the corresponding dates and remind you about upcoming once.
+ It displays birthday events from a JSON file on the corresponding dates and reminds you about upcoming ones.
 
 ## Requirements:
 
 - Node.js and VS Code installed on your system
 - Basic understanding of React, and Tailwind CSS
+
+## Features:
 
 ## Installation:
 
