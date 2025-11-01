@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Calendar as ShadcnCalendar } from './components/ui/calendar';
 import birthdaysData from './birthdays.json';
 
 interface Birthday {
@@ -8,68 +9,176 @@ interface Birthday {
 
 const Calendar = () => {
   const [birthdays, setBirthdays] = useState<Birthday[]>([]);
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   useEffect(() => {
     setBirthdays(birthdaysData);
   }, []);
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return `${date.getDate()}/${date.getMonth() + 1}`;
+  // Parse birthday dates and normalize them to current year for comparison
+  const parseBirthdayDate = (dateString: string): Date => {
+    return new Date(dateString);
   };
 
-  const getMonthName = (month: number) => {
-    return new Date(currentYear, month).toLocaleString('default', { month: 'long' });
+  // Get birthdays for a specific date (ignoring year)
+  const getBirthdaysForDate = (date: Date): Birthday[] => {
+    return birthdays.filter(birthday => {
+      const birthdayDate = parseBirthdayDate(birthday.date);
+      return birthdayDate.getMonth() === date.getMonth() &&
+        birthdayDate.getDate() === date.getDate();
+    });
   };
 
-  const goToPreviousMonth = () => {
-    setCurrentMonth((prevMonth) => (prevMonth === 0 ? 11 : prevMonth - 1));
-    setCurrentYear((prevYear) => (currentMonth === 0 ? prevYear - 1 : prevYear));
+  // Get all birthday dates for the calendar modifiers (for any year)
+  const getBirthdayDates = (year?: number): Date[] => {
+    // If no year specified, generate for a range of years around current
+    if (!year) {
+      const currentYear = new Date().getFullYear();
+      const years = [];
+      // Generate birthdays for 10 years before and after current year
+      for (let y = currentYear - 10; y <= currentYear + 10; y++) {
+        years.push(y);
+      }
+
+      return years.flatMap(y =>
+        birthdays.map(birthday => {
+          const birthdayDate = parseBirthdayDate(birthday.date);
+          return new Date(y, birthdayDate.getMonth(), birthdayDate.getDate());
+        })
+      );
+    }
+
+    // Generate for specific year
+    return birthdays.map(birthday => {
+      const birthdayDate = parseBirthdayDate(birthday.date);
+      return new Date(year, birthdayDate.getMonth(), birthdayDate.getDate());
+    });
   };
 
-  const goToNextMonth = () => {
-    setCurrentMonth((prevMonth) => (prevMonth === 11 ? 0 : prevMonth + 1));
-    setCurrentYear((prevYear) => (currentMonth === 11 ? prevYear + 1 : prevYear));
-  };
+  // Get today's birthdays
+  const todaysBirthdays = getBirthdaysForDate(new Date());
 
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const today = new Date();
-  const todayFormatted = formatDate(today.toISOString());
-  const todayBirthday = birthdays.find((birthday) => formatDate(birthday.date) === todayFormatted);
+  // Get selected date birthdays
+  const selectedDateBirthdays = selectedDate ? getBirthdaysForDate(selectedDate) : [];
+
+  const calculateAge = (birthdayString: string, asOfDate?: Date): number => {
+    const birthDate = parseBirthdayDate(birthdayString);
+    const referenceDate = asOfDate || new Date();
+    let age = referenceDate.getFullYear() - birthDate.getFullYear();
+    const monthDiff = referenceDate.getMonth() - birthDate.getMonth();
+
+    if (monthDiff < 0 || (monthDiff === 0 && referenceDate.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
+    return age;
+  };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-4">
-        <button onClick={goToPreviousMonth} className="text-lg font-bold">&lt;</button>
-        <h1 className="text-2xl font-bold">
-          {getMonthName(currentMonth)} {currentYear}
-        </h1>
-        <button onClick={goToNextMonth} className="text-lg font-bold">&gt;</button>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 text-center">
-        {[...Array(daysInMonth)].map((_, index) => {
-          const currentDate = new Date(currentYear, currentMonth, index + 1);
-          const formattedDate = formatDate(currentDate.toISOString());
-          const birthdayEvents = birthdays.filter((birthday) => formatDate(birthday.date) === formattedDate);
-          const isToday = currentDate.toDateString() === new Date().toDateString();
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold text-center mb-8">Birthday Calendar</h1>
 
-          return (
-            <div key={index} className={`p-4 border border-slate-500 hover:border-slate-400 ${isToday ? 'bg-black text-white' : ''}`}>
-              <div className="font-bold">{formattedDate}</div>
-              {birthdayEvents.map((event, index) => (
-                <div className="bg-sky-400 text-white hover:bg-sky-500 active:bg-sky-600 focus:outline-none focus:ring focus:ring-sky-300" key={index}>{event.name}</div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Calendar Section */}
+        <div className="flex flex-col items-center">
+          <ShadcnCalendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={setSelectedDate}
+            modifiers={{
+              birthday: getBirthdayDates(),
+            }}
+            modifiersStyles={{
+              birthday: {
+                backgroundColor: '#0ea5e9',
+                color: 'white',
+                fontWeight: 'bold'
+              }
+            }}
+            className="rounded-md border"
+          />
+
+          <div className="mt-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-blue-500 rounded"></div>
+              <span>Birthday</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Birthday Details Section */}
+        <div className="space-y-6">
+          {/* Today's Birthdays */}
+          {todaysBirthdays.length > 0 && (
+            <div className="p-6 border border-blue-200 bg-blue-50 rounded-lg">
+              <h2 className="text-xl font-semibold text-blue-800 mb-4">🎉 Today's Birthdays!</h2>
+              {todaysBirthdays.map((birthday, index) => (
+                <div key={index} className="mb-3 last:mb-0">
+                  <div className="font-medium text-blue-900">{birthday.name}</div>
+                  <div className="text-sm text-blue-700">
+                    Turning {calculateAge(birthday.date)} years old today!
+                  </div>
+                </div>
               ))}
             </div>
-          );
-        })}
-      </div>
-      {todayBirthday && (
-        <div className="mt-4 p-4 border border-gray-300 sm:text-2xl text-xl font-medium text-blue-500 hover:text-blue-900 underline">
-          Happy Birthday, {todayBirthday.name}!<br></br> May your birthday be filled with happiness!. You are {today.getFullYear() - new Date(todayBirthday.date).getFullYear()} years old today!
+          )}
+
+          {/* Selected Date Birthdays */}
+          {selectedDate && selectedDateBirthdays.length > 0 && (
+            <div className="p-6 border border-gray-200 bg-gray-50 rounded-lg">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">
+                Birthdays on {selectedDate.toLocaleDateString()}
+              </h2>
+              {selectedDateBirthdays.map((birthday, index) => (
+                <div key={index} className="mb-3 last:mb-0">
+                  <div className="font-medium text-gray-900">{birthday.name}</div>
+                  <div className="text-sm text-gray-600">
+                    Born {parseBirthdayDate(birthday.date).getFullYear()}
+                    {selectedDate ? ` (Age on this date: ${calculateAge(birthday.date, selectedDate)})` : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Upcoming Birthdays */}
+          <div className="p-6 border border-gray-200 rounded-lg">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Upcoming Birthdays</h2>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {birthdays
+                .map(birthday => ({
+                  ...birthday,
+                  nextBirthday: (() => {
+                    const birthdayDate = parseBirthdayDate(birthday.date);
+                    const currentYear = new Date().getFullYear();
+                    let nextBirthday = new Date(currentYear, birthdayDate.getMonth(), birthdayDate.getDate());
+
+                    if (nextBirthday < new Date()) {
+                      nextBirthday = new Date(currentYear + 1, birthdayDate.getMonth(), birthdayDate.getDate());
+                    }
+
+                    return nextBirthday;
+                  })()
+                }))
+                .sort((a, b) => a.nextBirthday.getTime() - b.nextBirthday.getTime())
+                .slice(0, 5)
+                .map((birthday, index) => (
+                  <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+                    <div>
+                      <div className="font-medium">{birthday.name}</div>
+                      <div className="text-sm text-gray-600">
+                        {birthday.nextBirthday.toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {Math.ceil((birthday.nextBirthday.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
